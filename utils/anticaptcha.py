@@ -43,5 +43,5 @@ def solve_anticaptcha(imagemBase64)->str:
             captcha_texto = resultado["solution"]["text"]
             break
         time.sleep(2)
-    logger.info("CAPTCHA:", captcha_texto)
+    logger.info(f"CAPTCHA: {captcha_texto}")
     return captcha_texto

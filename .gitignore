@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+#Retirando Resultado do git
+resultado.json
+
+#Retirando o database.db do git
+database.db

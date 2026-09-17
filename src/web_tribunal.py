@@ -1,4 +1,5 @@
-from utils import setup_logger, solve_anticaptcha
+from utils import setup_logger, solve_anticaptcha, ler_json,escrever_json
+from database import inserir_resultado
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
@@ -14,22 +15,24 @@ class WebTribunal:
         self.limiteConsulta = int(os.getenv("limiteConsulta", 5))
         logger.info("Iniciando web tribunal")
 
-    def openBrowser(self):
+    def buscaNome(self, nome, idNome)->str:
         logger.info("Iniciando openBrowser e abrindo o navegador")
         driver = webdriver.Chrome()
         driver.get(self.url)
-        driver.find_element(By.ID, 'txtStrParte').send_keys('ADILSON DA SILVA')
+        driver.find_element(By.ID, 'txtStrParte').send_keys(nome)
         captcha = driver.find_element(By.ID, "lblInfraCaptcha").find_element(By.TAG_NAME, "img").get_attribute("src")
         imagemBase64 = captcha.split(",", 1)[1]
         solvedAnticaptcha = solve_anticaptcha(imagemBase64=imagemBase64)
         driver.find_element(By.ID, 'txtInfraCaptcha').send_keys(solvedAnticaptcha)
         driver.find_element(By.ID, 'sbmNovo').click()
         aba_principal = driver.current_window_handle
+        resultado = ler_json(diretorio='resultados')
         tabela = driver.find_elements(By.TAG_NAME, 'tr')
         for index, item in enumerate(tabela):
             col = item.find_elements(By.TAG_NAME, 'td')
             if len(col) > 0:
                 logger.info(col[0].text)
+                nome = col[0].text
                 link = col[0].find_element(By.TAG_NAME, 'a').get_attribute('href')
                 driver.execute_script("window.open(arguments[0], '_blank');", link)
                 driver.switch_to.window(driver.window_handles[-1])
@@ -43,21 +46,28 @@ class WebTribunal:
                 classeAcao = driver.find_element(By.ID, 'txtClasse').text
                 codigoDescricao = driver.find_element(By.XPATH, '//*[@id="fldAssuntos"]/table/tbody/tr[2]/td[1]').text
                 assuntoDescricao = driver.find_element(By.XPATH, '//*[@id="fldAssuntos"]/table/tbody/tr[2]/td[2]').text
-                logger.info(f'''Processo: {nProcesso},
-                             Data Atuação: {dataAtuacao},
-                             Situação: {situacao},
-                             Orgão Julgador: {orgaoJulgador},
-                             Juiz: {juiz},
-                             Classe da Ação: {classeAcao},
-                             Codigo: {codigoDescricao}
-                             Descrição: {assuntoDescricao}''')
+                processo = {
+                    "nome_id": idNome,
+                    "nome": nome,
+                    "processo": nProcesso,
+                    "data_atuacao": dataAtuacao,
+                    "situacao": situacao,
+                    "orgao_julgador": orgaoJulgador,
+                    "juiz": juiz,
+                    "classe_acao": classeAcao,
+                    "codigo": codigoDescricao,
+                    "descricao": assuntoDescricao
+                }
+                logger.info(processo)
+                resultado["processos"].append(processo)
+                inserir_resultado(processo)
                 driver.close()
                 driver.switch_to.window(aba_principal)
                 if index >= self.limiteConsulta:
                     logger.info(f'Limite de consultas batido: {self.limiteConsulta}')
                     break
+        logger.info('Adicionando valores no json')
+        escrever_json(resultado)
         driver.close()
         logger.info('Processo finalizado')
-
-
-WebTribunal().openBrowser()
+        return 'ok'
